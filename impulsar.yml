@@ -1,0 +1,45 @@
+save: # Job nur für die Initialisierungsphase benötigt
+  script:
+    - |
+      git add . && git commit --amend --no-edit && git push -f
+
+build:
+  jobs:
+    - build-frontend
+    - copy
+    - build-backend
+
+build-frontend:
+  workDir: frontend
+  script:
+    - npm install
+    - npm run build
+
+copy:
+  script:
+    - |
+      {{if eq .OS "linux"}}
+        rsync -av --delete frontend/dist/ backend/static/
+        mv -v backend/static/index.html backend/static/index.htm
+      {{else}}
+        Remove-Item -Recurse -Force backend/static/
+        Copy-Item -Recurse frontend/dist/* backend/static/
+        Move-Item backend/static/index.html backend/static/index.htm
+      {{end}}
+
+build-backend:
+  workDir: backend
+  foreach:
+    - GOOS: linux
+      GOARCH: amd64
+      EXE: ""
+    - GOOS: linux
+      GOARCH: arm64
+      EXE: ""
+    - GOOS: windows
+      GOARCH: amd64
+      EXE: ".exe"
+  script:pre:
+    - mkdir release
+  script:
+    - go build -o release/chicoree-{{.GOOS}}-{{.GOARCH}}{{.EXE}}
